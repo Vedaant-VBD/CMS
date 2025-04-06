@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Cargo Management System</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: 'Inter', sans-serif;
+      background: #f1f4f9;
+      padding: 2rem;
+      color: #222;
+    }
+    h1 {
+      text-align: center;
+      margin-bottom: 2rem;
+      font-size: 2.5rem;
+      color: #2b3a55;
+    }
+    section {
+      background: white;
+      border-radius: 16px;
+      padding: 1.5rem;
+      margin-bottom: 1.5rem;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.05);
+      transition: box-shadow 0.2s;
+    }
+    section:hover {
+      box-shadow: 0 6px 16px rgba(0,0,0,0.1);
+    }
+    h2 {
+      margin-top: 0;
+      font-size: 1.4rem;
+      color: #333;
+    }
+    input[type="file"],
+    input[type="text"],
+    input[type="number"] {
+      padding: 0.5rem;
+      font-size: 1rem;
+      margin-right: 1rem;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      width: 250px;
+    }
+    button {
+      background-color: #2b7de9;
+      color: white;
+      border: none;
+      border-radius: 8px;
+      padding: 0.5rem 1rem;
+      font-size: 1rem;
+      cursor: pointer;
+      transition: background 0.2s ease;
+    }
+    button:hover {
+      background-color: #1f5fc1;
+    }
+    .result {
+      margin-top: 1rem;
+      padding: 1rem;
+      background-color: #f9f9f9;
+      border-left: 4px solid #007bff;
+      font-family: monospace;
+      font-size: 0.95rem;
+      white-space: pre-wrap;
+      border-radius: 8px;
+    }
+    .message {
+      background: #d9f2e6;
+      border-left: 4px solid #2ecc71;
+      padding: 1rem;
+      margin-bottom: 1rem;
+      border-radius: 8px;
+      font-weight: 500;
+      animation: fadein 0.5s ease;
+    }
+    @keyframes fadein {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+  </style>
+</head>
+<body>
+
+  <h1>🚀 Cargo Management System</h1>
+
+  <div id="messageContainer"></div>
+
+  <section>
+    <h2>1. Import Containers</h2>
+    <input type="file" id="containersFile">
+    <button onclick="uploadFile('containersFile', '/api/import/items')">Upload Containers</button>
+  </section>
+
+  <section>
+    <h2>2. Import Items</h2>
+    <input type="file" id="itemsFile">
+    <button onclick="uploadFile('itemsFile', '/api/import/items')">Upload Items</button>
+  </section>
+
+  <section>
+    <h2>3. Get Placement Recommendations</h2>
+    <button onclick="getPlacement()">Get Placement</button>
+    <div class="result" id="placementResult"></div>
+  </section>
+
+  <section>
+    <h2>4. Search Item</h2>
+    <input type="text" id="searchItemId" placeholder="Enter Item ID">
+    <button onclick="searchItem()">Search</button>
+    <div class="result" id="searchResult"></div>
+  </section>
+
+  <section>
+    <h2>5. Identify Waste</h2>
+    <button onclick="identifyWaste()">Identify Waste</button>
+    <div class="result" id="wasteResult"></div>
+  </section>
+
+  <section>
+    <h2>6. Simulate Time</h2>
+    <input type="number" id="simulateDays" placeholder="Enter number of days">
+    <button onclick="simulateTime()">Simulate</button>
+    <div class="result" id="simulateResult"></div>
+  </section>
+
+  <section>
+    <h2>7. View Logs</h2>
+    <button onclick="getLogs()">Get Logs</button>
+    <div class="result" id="logsResult"></div>
+  </section>
+
+  <script>
+    let itemsData = [];
+    let containersData = [];
+  
+    async function uploadFile(inputId, url) {
+      const fileInput = document.getElementById(inputId);
+      const file = fileInput.files[0];
+      if (!file) return alert("No file selected.");
+  
+      const formData = new FormData();
+      formData.append("file", file);
+  
+      const response = await fetch(url, {
+        method: "POST",
+        body: formData
+      });
+      const result = await response.json();
+      alert(JSON.stringify(result, null, 2));
+  
+      // 🧠 Parse the CSV to JSON and store
+      const text = await file.text();
+      const lines = text.trim().split('\n');
+      const headers = lines[0].split(',');
+  
+      const parsed = lines.slice(1).map(line => {
+        const values = line.split(',');
+        const obj = {};
+        headers.forEach((h, i) => obj[h.trim()] = values[i].trim());
+        return obj;
+      });
+  
+      if (inputId === 'itemsFile') itemsData = parsed;
+      else if (inputId === 'containersFile') containersData = parsed;
+    }
+  
+    async function getPlacement() {
+      const items = itemsData.map(item => ({
+        itemId: item.itemId,
+        name: item.name,
+        width: parseInt(item.width),
+        depth: parseInt(item.depth),
+        height: parseInt(item.height),
+        priority: parseInt(item.priority),
+        expiryDate: item.expiryDate,
+        usageLimit: parseInt(item.usageLimit),
+        preferredZone: item.preferredZone
+      }));
+  
+      const containers = containersData.map(c => ({
+        containerId: c.containerId,
+        zone: c.zone,
+        width: parseInt(c.width),
+        depth: parseInt(c.depth),
+        height: parseInt(c.height)
+      }));
+  
+      const response = await fetch('/api/placement', {
+        method: 'POST',
+        headers: {'Content-Type': 'application/json'},
+        body: JSON.stringify({ items, containers })
+      });
+  
+      const result = await response.json();
+      document.getElementById("placementResult").textContent = JSON.stringify(result, null, 2);
+    }
+  
+    async function searchItem() {
+      const itemId = document.getElementById("searchItemId").value;
+      const response = await fetch(`/api/search?itemId=${itemId}`);
+      const result = await response.json();
+      document.getElementById("searchResult").textContent = JSON.stringify(result, null, 2);
+    }
+  
+    async function identifyWaste() {
+      const response = await fetch('/api/waste/identify');
+      const result = await response.json();
+      document.getElementById("wasteResult").textContent = JSON.stringify(result, null, 2);
+    }
+  </script>
+
+</body>
+</html>
